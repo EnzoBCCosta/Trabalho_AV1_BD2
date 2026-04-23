@@ -1,13 +1,7 @@
--- 1. Criação de Tipos (Enums)
-CREATE TYPE status_matricula AS ENUM ('ativa', 'cancelada');
-CREATE TYPE status_parcela AS ENUM ('em_aberto', 'quitada');
-CREATE TYPE status_curso AS ENUM ('concluido', 'em_andamento');
-CREATE TYPE status_resultado AS ENUM ('aprovado', 'reprovado');
-CREATE TYPE aprovacao AS ENUM ('aprovado', 'reprovado', 'andamento');
+-- 1.Criação de Tabelas
 
--- 2. Criação de Tabelas
 CREATE TABLE professor (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(150) NOT NULL,
     cpf CHAR(11) NOT NULL UNIQUE,
     logradouro VARCHAR(200) NOT NULL,
@@ -22,7 +16,7 @@ CREATE TABLE professor (
 );
 
 CREATE TABLE estudante (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(150) NOT NULL,
     cpf CHAR(11) NOT NULL UNIQUE,
     logradouro VARCHAR(200) NOT NULL,
@@ -37,105 +31,150 @@ CREATE TABLE estudante (
 );
 
 CREATE TABLE curso (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
-    valor NUMERIC(10,2) NOT NULL
+    valor DECIMAL(10,2) NOT NULL
 );
 
 CREATE TABLE ano_serie (
-    id SERIAL PRIMARY KEY,
-    curso_id INT NOT NULL REFERENCES curso(id),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    curso_id INT NOT NULL,
     numero SMALLINT NOT NULL,
     descricao VARCHAR(100),
-    UNIQUE (curso_id, numero)
+    UNIQUE (curso_id, numero),
+    CONSTRAINT fk_ano_curso FOREIGN KEY (curso_id) REFERENCES curso(id)
 );
 
 CREATE TABLE disciplina (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     descricao VARCHAR(255)
 );
 
 CREATE TABLE ano_disciplina (
-    ano_serie_id INT NOT NULL REFERENCES ano_serie(id),
-    disciplina_id INT NOT NULL REFERENCES disciplina(id),
-    PRIMARY KEY (ano_serie_id, disciplina_id)
+    ano_serie_id INT NOT NULL,
+    disciplina_id INT NOT NULL,
+    PRIMARY KEY (ano_serie_id, disciplina_id),
+    CONSTRAINT fk_ad_ano FOREIGN KEY (ano_serie_id) REFERENCES ano_serie(id),
+    CONSTRAINT fk_ad_disc FOREIGN KEY (disciplina_id) REFERENCES disciplina(id)
 );
 
 CREATE TABLE professor_disciplina (
-    professor_id INT NOT NULL REFERENCES professor(id),
-    disciplina_id INT NOT NULL REFERENCES disciplina(id),
-    PRIMARY KEY (professor_id, disciplina_id)
+    professor_id INT NOT NULL,
+    disciplina_id INT NOT NULL,
+    PRIMARY KEY (professor_id, disciplina_id),
+    CONSTRAINT fk_pd_prof FOREIGN KEY (professor_id) REFERENCES professor(id),
+    CONSTRAINT fk_pd_disc FOREIGN KEY (disciplina_id) REFERENCES disciplina(id)
 );
 
 CREATE TABLE turma (
-    id SERIAL PRIMARY KEY,
-    ano_serie_id INT NOT NULL REFERENCES ano_serie(id),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ano_serie_id INT NOT NULL,
     nome VARCHAR(50) NOT NULL,
     sala VARCHAR(50) NOT NULL,
     ano_letivo SMALLINT NOT NULL,
-    UNIQUE (ano_serie_id, nome, ano_letivo)
+    UNIQUE (ano_serie_id, nome, ano_letivo),
+    CONSTRAINT fk_turma_ano FOREIGN KEY (ano_serie_id) REFERENCES ano_serie(id)
 );
 
 CREATE TABLE matricula (
-    id SERIAL PRIMARY KEY,
-    estudante_id INT NOT NULL REFERENCES estudante(id),
-    curso_id INT NOT NULL REFERENCES curso(id),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    estudante_id INT NOT NULL,
+    curso_id INT NOT NULL,
     numero VARCHAR(20) NOT NULL UNIQUE,
     data_matricula DATE NOT NULL,
-    situacao status_matricula NOT NULL DEFAULT 'ativa'
+    situacao ENUM('ativa', 'cancelada', 'transferido') NOT NULL DEFAULT 'ativa',
+    CONSTRAINT fk_mat_estudante FOREIGN KEY (estudante_id) REFERENCES estudante(id),
+    CONSTRAINT fk_mat_curso FOREIGN KEY (curso_id) REFERENCES curso(id)
 );
 
 CREATE TABLE parcela (
-    id SERIAL PRIMARY KEY,
-    matricula_id INT NOT NULL REFERENCES matricula(id),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    matricula_id INT NOT NULL,
+    numero_parcela TINYINT NOT NULL,
     codigo_bancario VARCHAR(100) NOT NULL UNIQUE,
     data_vencimento DATE NOT NULL,
-    valor NUMERIC(10,2) NOT NULL,
-    valor_pago NUMERIC(10,2),
+    valor DECIMAL(10,2) NOT NULL,
+    valor_pago DECIMAL(10,2),
     data_pagamento DATE,
-    estado status_parcela NOT NULL DEFAULT 'em_aberto'
+    estado ENUM('em_aberto', 'quitada') NOT NULL DEFAULT 'em_aberto',
+    UNIQUE (matricula_id, numero_parcela),
+    CONSTRAINT fk_parc_mat FOREIGN KEY (matricula_id) REFERENCES matricula(id)
 );
 
 CREATE TABLE historico_curso (
-    id SERIAL PRIMARY KEY,
-    matricula_id INT NOT NULL UNIQUE REFERENCES matricula(id),
-    situacao_curso status_curso NOT NULL DEFAULT 'em_andamento',
-    data_conclusao DATE
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    matricula_id INT NOT NULL UNIQUE,
+    situacao_curso ENUM('concluido', 'em_andamento') NOT NULL DEFAULT 'em_andamento',
+    data_conclusao DATE,
+    CONSTRAINT fk_hc_mat FOREIGN KEY (matricula_id) REFERENCES matricula(id)
 );
 
 CREATE TABLE historico_ano (
-    id SERIAL PRIMARY KEY,
-    historico_curso_id INT NOT NULL REFERENCES historico_curso(id),
-    ano_serie_id INT NOT NULL REFERENCES ano_serie(id),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    historico_curso_id INT NOT NULL,
+    ano_serie_id INT NOT NULL,
     ano_letivo SMALLINT NOT NULL,
-    percentual_frequencia NUMERIC(5,2),
-    resultado status_resultado,
-    UNIQUE (historico_curso_id, ano_serie_id, ano_letivo)
+    percentual_frequencia DECIMAL(5,2),
+    resultado ENUM('aprovado', 'reprovado'),
+    UNIQUE (historico_curso_id, ano_serie_id, ano_letivo),
+    CONSTRAINT fk_ha_hc FOREIGN KEY (historico_curso_id) REFERENCES historico_curso(id),
+    CONSTRAINT fk_ha_ano FOREIGN KEY (ano_serie_id) REFERENCES ano_serie(id)
 );
 
 CREATE TABLE desempenho_disciplina (
-    id SERIAL PRIMARY KEY,
-    historico_ano_id INT NOT NULL REFERENCES historico_ano(id),
-    disciplina_id INT NOT NULL REFERENCES disciplina(id),
-    nota_bimestre1 NUMERIC(4,2),
-    nota_bimestre2 NUMERIC(4,2),
-    nota_bimestre3 NUMERIC(4,2),
-    nota_bimestre4 NUMERIC(4,2),
-    media NUMERIC(4,2),
-    nota_recuperacao NUMERIC(4,2),
-    media_final NUMERIC(4,2),
-    resultado aprovacao DEFAULT 'andamento',
-    UNIQUE (historico_ano_id, disciplina_id)
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    historico_ano_id INT NOT NULL,
+    disciplina_id INT NOT NULL,
+    nota_bimestre1 DECIMAL(4,2),
+    nota_bimestre2 DECIMAL(4,2),
+    nota_bimestre3 DECIMAL(4,2),
+    nota_bimestre4 DECIMAL(4,2),
+    media DECIMAL(4,2),
+    nota_recuperacao DECIMAL(4,2),
+    media_final DECIMAL(4,2),
+    resultado ENUM('aprovado', 'reprovado', 'andamento') DEFAULT 'andamento',
+    UNIQUE (historico_ano_id, disciplina_id),
+    CONSTRAINT fk_dd_ha FOREIGN KEY (historico_ano_id) REFERENCES historico_ano(id),
+    CONSTRAINT fk_dd_disc FOREIGN KEY (disciplina_id) REFERENCES disciplina(id)
 );
 
 CREATE TABLE alocacao_turma (
-    id SERIAL PRIMARY KEY,
-    matricula_id INT NOT NULL REFERENCES matricula(id),
-    turma_id INT NOT NULL REFERENCES turma(id),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    matricula_id INT NOT NULL,
+    turma_id INT NOT NULL,
     numero_chamada SMALLINT NOT NULL,
     data_inicio DATE NOT NULL,
     data_remanejamento DATE,
-    UNIQUE (turma_id, numero_chamada, data_inicio)
+    UNIQUE (turma_id, numero_chamada, data_inicio),
+    CONSTRAINT fk_aloc_mat FOREIGN KEY (matricula_id) REFERENCES matricula(id),
+    CONSTRAINT fk_aloc_turma FOREIGN KEY (turma_id) REFERENCES turma(id)
 );
 
+DELIMITER $$
+
+CREATE TRIGGER trg_gerar_parcelas
+AFTER INSERT ON matricula
+FOR EACH ROW
+BEGIN
+    DECLARE i INT DEFAULT 1;
+    DECLARE valor_parcela DECIMAL(10,2);
+
+    SELECT ROUND(valor / 12, 2) INTO valor_parcela
+    FROM curso WHERE id = NEW.curso_id;
+
+    WHILE i <= 12 DO
+        INSERT INTO parcela (matricula_id, numero_parcela, codigo_bancario, data_vencimento, valor, estado)
+        VALUES (
+            NEW.id,
+            i,
+            CONCAT('BOL-', NEW.numero, '-', LPAD(i, 2, '0')),
+            DATE_ADD(NEW.data_matricula, INTERVAL i MONTH),
+            valor_parcela,
+            'em_aberto'
+        );
+        SET i = i + 1;
+    END WHILE;
+END$$
+
+DELIMITER ;
